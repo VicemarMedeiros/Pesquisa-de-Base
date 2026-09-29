@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Simulador de Urna — Eleições 2026</title>
+<style>
+  :root{
+    --case:#3b3f45; --case2:#2a2d32; --screen:#0c1a0f; --lcd:#8dffb0; --lcd-dim:#2f6b45;
+    --key:#e7e9ec; --key-shadow:#9aa0a8; --accent:#1f6b3a; --red:#b23b3b; --amber:#c98a1c;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  body{
+    margin:0; min-height:100vh; background:#15171a;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    font-family:"Segoe UI",Arial,sans-serif;
+  }
+  .urna{
+    width:100%; max-width:380px; background:linear-gradient(180deg,var(--case),var(--case2));
+    border-radius:18px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .brand{ text-align:center; color:#c7cbd1; font-size:11px; letter-spacing:3px; margin-bottom:10px; }
+  .brand b{ color:#fff; letter-spacing:1px; }
+  .screen{
+    background:var(--screen); border-radius:8px; padding:16px 14px; min-height:190px;
+    box-shadow:inset 0 0 14px rgba(0,0,0,.7), inset 0 0 0 3px #000;
+    display:flex; flex-direction:column; justify-content:center; gap:6px;
+    font-family:"Courier New",monospace; color:var(--lcd);
+  }
+  .screen .muted{ color:var(--lcd-dim); }
+  .office{ font-size:13px; letter-spacing:1px; text-transform:uppercase; opacity:.9; }
+  .digits{ font-size:40px; letter-spacing:6px; min-height:48px; }
+  .digits .ph{ color:var(--lcd-dim); }
+  .name{ font-size:15px; margin-top:2px; min-height:20px; }
+  .party{ font-size:12px; color:var(--lcd-dim); min-height:16px; }
+  .hint{ font-size:11px; color:var(--lcd-dim); margin-top:8px; line-height:1.4; }
+  .center{ text-align:center; }
+  .progress{ display:flex; gap:4px; justify-content:center; margin-top:12px; }
+  .progress span{ width:18px; height:4px; border-radius:2px; background:#4a4f56; }
+  .progress span.done{ background:var(--accent); }
+  .progress span.now{ background:var(--lcd); }
+
+  .keys{ margin-top:14px; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .key{
+    background:linear-gradient(180deg,var(--key),#cfd3d8); border:none; border-radius:8px;
+    padding:14px 0; font-size:20px; font-weight:700; color:#20242a;
+    box-shadow:0 3px 0 var(--key-shadow), 0 4px 6px rgba(0,0,0,.4);
+  }
+  .key:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--key-shadow); }
+  .key.wide{ grid-column:span 3; }
+  .key.corrige{ background:linear-gradient(180deg,#e0a3a3,var(--red)); color:#fff; }
+  .key.branco{ background:linear-gradient(180deg,#d8d8d8,#aeb2b7); color:#20242a; }
+  .key.confirma{ background:linear-gradient(180deg,#6fd68e,var(--accent)); color:#08260f; font-size:16px; letter-spacing:1px; }
+  .key:disabled{ opacity:.4; }
+
+  .start{ text-align:center; color:#fff; }
+  .start h1{ font-size:19px; margin:6px 0 2px; }
+  .start p{ color:#c7cbd1; font-size:13px; line-height:1.5; }
+  .disclosure{
+    background:#1d2024; border:1px solid #3a3f45; border-radius:8px; padding:10px 12px;
+    color:#9aa4ad; font-size:11.5px; line-height:1.5; margin:14px 0;
+  }
+  .goBtn{
+    width:100%; margin-top:6px; padding:14px; border:none; border-radius:10px;
+    background:linear-gradient(180deg,#6fd68e,var(--accent)); color:#08260f;
+    font-size:16px; font-weight:700; letter-spacing:.5px;
+  }
+  .goBtn:active{ transform:translateY(1px); }
+
+  .final{ text-align:center; }
+  .final .big{ font-size:17px; margin:4px 0; }
+  .final .small{ font-size:11.5px; color:var(--lcd-dim); margin-top:10px; line-height:1.5; }
+  .restart{
+    width:100%; margin-top:14px; padding:12px; border:none; border-radius:10px;
+    background:#e7e9ec; color:#20242a; font-weight:700; font-size:14px;
+  }
+  .sent-ok{ color:#8dffb0; }
+  .sent-fail{ color:#e0a3a3; }
+</style>
+</head>
+<body>
+
+<div class="urna">
+  <div class="brand">SIMULADOR DE URNA &nbsp;•&nbsp; <b>ELEIÇÕES 2026</b></div>
+
+  <!-- TELA 1: INÍCIO -->
+  <div id="screenStart" class="screen start">
+    <h1>Treine o seu voto</h1>
+    <p>Passe por todos os cargos como na urna oficial, no dia 04/10. Isso não substitui o voto real.</p>
+    <div class="disclosure">
+      <b>Aviso:</b> suas respostas aqui entram apenas num placar anônimo interno da campanha,
+      sem nome, telefone ou qualquer identificação. Nenhum dado pessoal é salvo.
+    </div>
+    <button class="goBtn" id="startBtn" onclick="iniciar()">INICIAR TREINO</button>
+    <p class="hint" id="alreadyVoted" style="display:none; margin-top:10px;">
+      Este navegador já treinou o voto. Para treinar de novo, use outro aparelho ou navegador.
+    </p>
+  </div>
+
+  <!-- TELA 2: VOTAÇÃO -->
+  <div id="screenVote" class="screen" style="display:none">
+    <div class="office" id="officeLabel">—</div>
+    <div class="digits" id="digitsDisplay"><span class="ph">—</span></div>
+    <div class="name" id="nameDisplay"></div>
+    <div class="party" id="partyDisplay"></div>
+    <div class="hint" id="hintText"></div>
+    <div class="progress" id="progressDots"></div>
+  </div>
+
+  <!-- TELA 3: FIM -->
+  <div id="screenEnd" class="screen final" style="display:none">
+    <div class="big">FIM DA VOTAÇÃO</div>
+    <div>Obrigado(a) por treinar!</div>
+    <div class="small" id="sendStatus">Enviando resultado anônimo…</div>
+  </div>
+
+  <!-- TECLADO -->
+  <div class="keys" id="keypad">
+    <button class="key" onclick="digit(1)">1</button>
+    <button class="key" onclick="digit(2)">2</button>
+    <button class="key" onclick="digit(3)">3</button>
+    <button class="key" onclick="digit(4)">4</button>
+    <button class="key" onclick="digit(5)">5</button>
+    <button class="key" onclick="digit(6)">6</button>
+    <button class="key" onclick="digit(7)">7</button>
+    <button class="key" onclick="digit(8)">8</button>
+    <button class="key" onclick="digit(9)">9</button>
+    <button class="key corrige" onclick="corrige()">CORRIGE</button>
+    <button class="key" onclick="digit(0)">0</button>
+    <button class="key branco" onclick="branco()">BRANCO</button>
+    <button class="key confirma wide" id="confirmBtn" onclick="confirma()">CONFIRMA</button>
+  </div>
+
+  <div id="screenRestart" style="display:none">
+    <button class="restart" onclick="location.reload()">TREINAR NOVAMENTE</button>
+  </div>
+</div>
+
+<iframe name="hiddenFrame" style="display:none"></iframe>
+<form id="gform" target="hiddenFrame" method="POST"
+      action="https://docs.google.com/forms/d/e/1FAIpQLSdgRgbqs1CFUliJ4seEaNWF__y-Li8IzCB74oq4C79EEsKIiA/formResponse">
+  <input type="hidden" name="entry.288097143" id="f_federal">
+  <input type="hidden" name="entry.256970698" id="f_distrital">
+  <input type="hidden" name="entry.1081448956" id="f_senador1">
+  <input type="hidden" name="entry.731739358" id="f_senador2">
+  <input type="hidden" name="entry.1750499602" id="f_governador">
+  <input type="hidden" name="entry.729799434" id="f_presidente">
+</form>
+
+<script>
+// Ordem oficial da urna. maxDigits = tamanho do número na cédula real.
+const OFFICES = [
+  { key:'federal',     label:'Deputado Federal',   maxDigits:4, fieldId:'f_federal' },
+  { key:'distrital',   label:'Deputado Distrital',  maxDigits:5, fieldId:'f_distrital' },
+  { key:'senador1',    label:'Senador(a)',          maxDigits:3, fieldId:'f_senador1' },
+  { key:'senador2',    label:'Senador(a)',          maxDigits:3, fieldId:'f_senador2' },
+  { key:'governador',  label:'Governador(a)',       maxDigits:2, fieldId:'f_governador' },
+  { key:'presidente',  label:'Presidente',          maxDigits:2, fieldId:'f_presidente' },
+];
+
+// Único candidato conhecido nesta simulação (evita inventar nomes de outros candidatos).
+// Governador e Senador ficam sem conferência: a numeração de coligação/federação
+// muda a cada eleição e não há confirmação segura disponível no momento da montagem.
+const KNOWN = {
+  distrital: {'10000':{nome:'MARCELO TRATOR'},'10010':{nome:'MC JENNY'},'10020':{nome:'GIULIANNO CARTAXO'},'10022':{nome:'PINHO'},'10026':{nome:'MIGUEL DA 26'},'10060':{nome:'PASTORA MÁRCIA'},'10061':{nome:'SCOOBY UBE'},'10100':{nome:'BISPO RENATO ANDRADE'},'10101':{nome:'CONDE'},'10110':{nome:'ANDREA ESPANHA'},'10123':{nome:'MARTINS MACHADO'},'10190':{nome:'DELEGADO FERNANDO FERNANDES'},'10193':{nome:'ERICSON GOMES'},'10222':{nome:'ESTEFANE SAMPAIO'},'10456':{nome:'DELMASSO'},'10505':{nome:'EMANUEL S.O.S'},'10555':{nome:'DELEGADA DOUTORA JANE'},'10722':{nome:'MARCOS PORTO'},'10777':{nome:'MARCELINHO CARIOCA'},'10789':{nome:'RENATA DAGUIAR'},'10888':{nome:'DENISE FRANCO'},'10987':{nome:'CRIS NARDES'},'11001':{nome:'REJANE COSTA'},'11010':{nome:'LÉO GOLEIRO'},'11011':{nome:'PEPA'},'11022':{nome:'ANA MARIA'},'11111':{nome:'RÔNEY NEMER'},'11112':{nome:'MARTHA ELIENE'},'11122':{nome:'VIRGÍLIO NETO'},'11123':{nome:'ISRAEL PRESENÇA'},'11133':{nome:'PASTOR DANIEL DE CASTRO'},'11211':{nome:'NATÁLIA REIS'},'11234':{nome:'VALDELINO BARCELOS'},'11410':{nome:'IURI MARQUES'},'11777':{nome:'MARCELINHO NUNES'},'12000':{nome:'JOVITA ROSA'},'12012':{nome:'PROF. CRISTIANO LUZ'},'12022':{nome:'JOSEFLAY JOSIAS'},'12061':{nome:'MERCIONE'},'12071':{nome:'MARQUIM DO TROPA'},'12101':{nome:'PR. SIDNEY'},'12105':{nome:'PAULINHO CAMPELLO'},'12110':{nome:'ANDRÉ PIRES'},'12112':{nome:'JAIR DOS APLICATIVOS'},'12122':{nome:'FRANCISCA CÔRTE'},'12123':{nome:'PROFESSOR FERNANDO MOURA'},'12126':{nome:'MARA MARÇAL'},'12222':{nome:'WEILA ALMEIDA'},'12300':{nome:'ZAQUEU ENGRAXATE'},'12307':{nome:'SORRISO'},'12321':{nome:'GABY'},'12331':{nome:'SUELI LÍDER GUERREIRA'},'12333':{nome:'ARILSON DE OLIVEIRA'},'12344':{nome:'DHIOGO BACURAU'},'12345':{nome:'JOE VALLE DA MALUNGA'},'12361':{nome:'PROFESSOR FERNANDO SOUSA'},'12369':{nome:'LÚCIA LUCIMAR'},'12456':{nome:'PROF. NILVAN DE VASCONCELLOS'},'12555':{nome:'PROFESSOR JAIRON'},'12777':{nome:'ALINE SÁ'},'13000':{nome:'ROSI COSTA'},'13001':{nome:'JACY AFONSO'},'13007':{nome:'FABIANO TROMPETISTA'},'13012':{nome:'ANDREY LEMOS'},'13013':{nome:'RICARDO VALE'},'13056':{nome:'DAYSE HANSA'},'13061':{nome:'JOÃO FAVORITO'},'13100':{nome:'CHICO VIGILANTE'},'13111':{nome:'LÚCIA CARVALHO'},'13123':{nome:'ZÉ DO COCO'},'13131':{nome:'GABRIEL MAGNO'},'13133':{nome:'PROFª ALTACI KOKAMA'},'13193':{nome:'LAUREANO DE FARIA'},'13197':{nome:'DANIEL BARROS'},'13321':{nome:'FÁTIMA RÔLA'},'13333':{nome:'MARIANA ROSA'},'13405':{nome:'PARDIM'},'13556':{nome:'PASTORA LUZINETE'},'13613':{nome:'PROFA. KEILA SANCHES'},'14000':{nome:'YURI KAIOLI'},'14001':{nome:'WELLINGTON CAMPOS'},'14014':{nome:'ARTHUR GURGEL'},'14040':{nome:'RHAILLER SANTOS'},'14100':{nome:'DRª CAROLINA MAIA'},'14114':{nome:'MATHEUS MARQUES'},'14123':{nome:'EDU SANTOS'},'14141':{nome:'HENRIQUE DURÃES'},'14149':{nome:'EMANUELLE'},'14321':{nome:'ANTHONY RIBAS'},'14441':{nome:'JANDERSON AGUIA'},'14444':{nome:'PERITA TIROTTI'},'14714':{nome:'AMANDA CAMARGO'},'14777':{nome:'TANIEL MACEDO'},'15000':{nome:'IOLANDO'},'15015':{nome:'CRISTIANO ARAÚJO',partido:'MDB'},'15100':{nome:'SAMARA BRITO'},'15111':{nome:'PROF FÁBIO CIDADE EDUCADORA'},'15123':{nome:'WELLINGTON LUIZ'},'15133':{nome:'GUSTAVO AIRES'},'15151':{nome:'MARCOS MARSHAL'},'15153':{nome:'PASTOR DÁCIO CORDEIRO'},'15156':{nome:'FERNANDA MATEUS'},'15166':{nome:'ZÉ ALENCAR'},'15190':{nome:'HERMETO'},'15222':{nome:'ÂNDREA ESTEVAM'},'15333':{nome:'SARGENTO TÁRIK'},'15444':{nome:'JÔ ASSISTENTE SOCIAL'},'15500':{nome:'DILSON RESENDE'},'15551':{nome:'EDSON SOL NASCENTE'},'15555':{nome:'MARCELA PASSAMANI'},'15678':{nome:'DR. CANDIDO TELES'},'15777':{nome:'DELEGADO JONATAS'},'15888':{nome:'CONCEIÇÃO DO MARANHÃO'},'15900':{nome:'JAQUELINE SILVA'},'18000':{nome:'ELAINY ELAS INDÍGENAS'},'18011':{nome:'CHIQUINHO LIVREIRO'},'18018':{nome:'ANGELINA NARDELLI'},'18081':{nome:'MIRANDA GOMES'},'18123':{nome:'BARTIRIA COLETIVO NOSSA GENTE'},'18180':{nome:'BETINHO GUARIROBA'},'18222':{nome:'SAMI YASSINE'},'18486':{nome:'ELIANA VETERINÁRIA'},'20000':{nome:'ROBÉRIO NEGREIROS'},'20001':{nome:'ARTUR CEZAR'},'20002':{nome:'DEO DO MANDALA'},'20020':{nome:'NETO RODRIGUES'},'20022':{nome:'ALESSANDRO MITO'},'20028':{nome:'PATRÍCIA HELENA'},'20033':{nome:'DR. KLEBES REZENDE'},'20061':{nome:'CLÁUDIO BORCEM'},'20088':{nome:'PRISCILA BACCILE'},'20090':{nome:'SGT. LUCIANO BAGLOGUI'},'20100':{nome:'ALEX GALVÃO'},'20101':{nome:'MANUELA ANDRADE'},'20111':{nome:'CLÁUDIA LAPA'},'20122':{nome:'CORONEL MICHELLO'},'20123':{nome:'ANA PAULA MARRA'},'20190':{nome:'SUBTENENTE GERALDO ALVES'},'20193':{nome:'COMANDANTE ALAN'},'20200':{nome:'SUZELE VELOSO'},'20222':{nome:'TELMA RUFINO'},'20226':{nome:'SARGENTO PAULO ROBERTO'},'20333':{nome:'CAPITÃO ADERIVALDO CARDOSO'},'20456':{nome:'CLEIDIANE VITALINO'},'20555':{nome:'ELIANA EMERICK'},'20700':{nome:'PR. JOÃO DE DEUS'},'20777':{nome:'NATAL FURUCHO'},'22000':{nome:'JOAQUIM RORIZ NETO'},'22001':{nome:'ANDREA PONTES'},'22002':{nome:'RICARDO CASTANHEIRA'},'22010':{nome:'DRA. KELLEN GUERRA'},'22022':{nome:'ANDRÉ KUBITSCHEK'},'22061':{nome:'ANNA SEBBA'},'22100':{nome:'RODRIGO DANTAS'},'22122':{nome:'CAROL KALIL'},'22123':{nome:'ALESSANDRO PAIVA'},'22190':{nome:'JULIA LUCY'},'22193':{nome:'ROOSEVELT VILELA'},'22221':{nome:'DRA CRIS'},'22222':{nome:'EDUARDO TORRES'},'22224':{nome:'JOÃO ALEXANDRE'},'22321':{nome:'FERNANDO CAIXETA'},'22322':{nome:'VICTOR JANSEN'},'22333':{nome:'ANDRÉIA MOURA'},'22422':{nome:'POLICIAL JOÃO RENATO'},'22478':{nome:'XANDÃO LELECO'},'22522':{nome:'EVANDRO ARAUJO'},'22555':{nome:'HAMILTON TATU'},'22722':{nome:'SAMUEL GAÚCHO'},'22777':{nome:'MARCELO IZIDORO'},'22822':{nome:'LUÍZA DO CLEZÃO'},'22888':{nome:'JOÃO CARDOSO'},'25000':{nome:'JOÃO LEAL'},'25001':{nome:'HELVÍDIO NUNES'},'25025':{nome:'ILENE ALMEIDA'},'25123':{nome:'GIGANTE DA FEDERAL'},'25190':{nome:'ANDRÉ PILLA'},'25444':{nome:'BRUNELLI'},'25500':{nome:'IRACEMA DURÃO'},'25555':{nome:'CASTELO'},'27000':{nome:'PASTOR RAFAEL'},'27012':{nome:'BISPO WELDON'},'27022':{nome:'DONNY SILVA'},'27024':{nome:'ELISSON FRANKLIN'},'27027':{nome:'CAIAFA'},'27100':{nome:'LORRUANA MEDEIROS'},'27111':{nome:'ÁGATHA LOPES'},'27123':{nome:'DR. GUTEMBERG'},'27127':{nome:'CARLOS XAVIER'},'27190':{nome:'CORONEL NEVITON SANGUE BOM'},'27222':{nome:'ALEXANDRE OLIVER'},'27234':{nome:'ZULEIKA DO BLOG'},'27272':{nome:'INÊS ARMAND'},'27277':{nome:'PROFESSOR WILLIAN COMUNIDADE'},'27300':{nome:'REINALDO ARAUJO'},'27321':{nome:'CLAUDECI LUART'},'27333':{nome:'MAGGIE MARGARIDA CHAULET'},'27391':{nome:'BITO RAMOS'},'27500':{nome:'JOÃO DITO'},'27555':{nome:'TIA MARIA'},'27700':{nome:'IZAQUIEL SOUZA'},'27727':{nome:'TIA LU'},'27777':{nome:'FERNANDO DO RESGATE'},'27888':{nome:'WELLINGTON MEGA'},'27999':{nome:'RACHEL DOCES'},'30000':{nome:'LGM'},'30007':{nome:'DR JACINTO'},'30022':{nome:'DR. ERIC GUSTAVO'},'30026':{nome:'DRA. ATENA OLIVEIRA'},'30030':{nome:'DEFENSOR KLEBER'},'30033':{nome:'MATHEUS FERNANDES'},'30061':{nome:'JÉZER JÚNIOR'},'30100':{nome:'ERICKA FILIPPELLI'},'30111':{nome:'DR. PETRUS'},'30123':{nome:'PAULO MINEIRO'},'30190':{nome:'JAIRO MELO'},'30222':{nome:'RICARDO CASTRO'},'30230':{nome:'ALEXA'},'30300':{nome:'ENGENHEIRO VALTER SABOIA'},'30303':{nome:'CRIS MOURÃO'},'30321':{nome:'LUCIANA MENDINA'},'30333':{nome:'REGIS MACHADO'},'30444':{nome:'PEDRO PAYNE'},'30456':{nome:'ALEX OLIVEIRA'},'30500':{nome:'DAIANE DOS SANTOS'},'30530':{nome:'FERNANDA FRANÇA'},'30555':{nome:'DRA.TÂNIA SOSTER'},'30700':{nome:'CAÇULECI PACHECO'},'30777':{nome:'AILUDE MÁXIMO'},'30888':{nome:'NOEMIA T BISPO'},'30999':{nome:'PROFESSOR ÁLVARO DOMINGUES'},'33000':{nome:'MISSIONÁRIA EUDES'},'33001':{nome:'SGT ROKSINAIDY'},'33003':{nome:'CAROL FORÇA DA MULHER'},'33007':{nome:'CORRETOR NOGUEIRA'},'33033':{nome:'BEBETO'},'33088':{nome:'EMANUELL RESOLVE'},'33100':{nome:'RAAD'},'33111':{nome:'JORGE FARIAS RODOVIÁRIO'},'33122':{nome:'LETÍCIA SAMPAIO'},'33123':{nome:'SARDINHA'},'33133':{nome:'GIZA TEA'},'33180':{nome:'DEISE ANDRADE'},'33190':{nome:'ULISSES DIAS'},'33192':{nome:'DR WENDEL MOREIRA'},'33222':{nome:'TABANEZ'},'33323':{nome:'FRANCIMAR NAVA'},'33333':{nome:'CAMARGO MINHA CAPITAL'},'33337':{nome:'CLEIA ARAÚJO'},'33355':{nome:'XANDÃO DO POVÃO'},'33456':{nome:'ITALO MIRANDA'},'33663':{nome:'THAYS MÃE DO GABRIEL'},'33700':{nome:'GUTEMBERG RIOS'},'33733':{nome:'AGENILDO NERI'},'33777':{nome:'CRICIA CANTORA DE PENTECOSTES'},'33789':{nome:'PEDRO MECÂNICO COLETIVO'},'35000':{nome:'GUARDA JANIO'},'35007':{nome:'ISA LUSTOSA'},'35017':{nome:'ANDREIA BOMBOM'},'35026':{nome:'SALVADOR CASTRO'},'35035':{nome:'MARCEL UBER BLACK'},'35100':{nome:'ALCIVÂNIO BOMFIM'},'35111':{nome:'ARCANJO MAGALHÃES'},'35123':{nome:'ROBÉRIO MELO TX'},'35133':{nome:'DIONES ALMEIDA'},'35135':{nome:'PRETA PRAIANA'},'35180':{nome:'CARLÃO RECLAMÃO'},'35192':{nome:'JORGE VIANNA'},'35222':{nome:'KEVIN VEM'},'35250':{nome:'ELIZEU SÍNDICO'},'35333':{nome:'ESTEFFANY'},'35353':{nome:'DIOLAN ROCHA'},'35355':{nome:'DR. LUCIMIR'},'35444':{nome:'IGOR SARAIVA'},'35456':{nome:'CLÁUDIO FERREIRA DOMINGUES'},'35500':{nome:'NANDA BATISTA'},'35555':{nome:'LUÍS MIRANDA'},'35678':{nome:'DRA. ANGÉLICA CARAÍBA'},'35777':{nome:'JAPA DA BIKE'},'35800':{nome:'ELIAS SANTOS'},'35888':{nome:'DRA. MÔNICA'},'35999':{nome:'PASTORA ALLANA'},'40023':{nome:'BARTOLOMEU BARTÔ RODRIGUES'},'40044':{nome:'LENNE EVANGELISTA'},'40061':{nome:'MÚCIO'},'40100':{nome:'BERNARDO MOREIRA'},'40109':{nome:'PROFESSOR DOUGLAS GOMES/O DIVO'},'40120':{nome:'PROFESSOR AHAROM'},'40123':{nome:'FERNANDO FREITAS'},'40140':{nome:'PROFESSORA JÉSSICA MOTTA'},'40200':{nome:'RAPHAEL SEBBA'},'40222':{nome:'DAYSE AMARILIO'},'40233':{nome:'MARI JOW'},'40321':{nome:'SOFIA CARVALHO'},'40333':{nome:'NAY DO ACARAJÉ'},'40400':{nome:'RODRIGO DIAS'},'40420':{nome:'PABLO FEITOSA'},'40567':{nome:'DENNIS WEB'},'40800':{nome:'GUILHERME CARVALHO EMANAR'},'43000':{nome:'EDUARDO BRANDÃO'},'43123':{nome:'ELKE PIMENTEL'},'43222':{nome:'JEAN DA CULTURA'},'44000':{nome:'EDUARDO PEDROSA'},'44007':{nome:'LUCIJAINE VILAR'},'44044':{nome:'PEDRO DO OVO'},'44070':{nome:'CRISTIANO SEVERO'},'44101':{nome:'DRA SUZANA LIMA'},'44123':{nome:'CLAUDIO ABRANTES'},'44180':{nome:'DELEGADA KAREN'},'44190':{nome:'PASTOR LEIBER'},'44197':{nome:'LACÍ MARINHO'},'44222':{nome:'DRA. FABI'},'44555':{nome:'PEDRO OLIVEIRA'},'44567':{nome:'SILVINHO ALMEIDA'},'45000':{nome:'CARLOS PENNA'},'45013':{nome:'PROFESSOR GUSTAVO SALLES'},'45045':{nome:'DATANIEL DUARTE'},'45061':{nome:'EDLEUZO CAVALCANTE'},'45100':{nome:'JULIANA CÂNDIDA'},'45123':{nome:'LUCIANA LIMA'},'45125':{nome:'TINA'},'45130':{nome:'MARIA DUCLERIO'},'45145':{nome:'PROFESSOR DIEGO GOMES'},'45155':{nome:'CLEA TORRES'},'45163':{nome:'VALDECY LÍDER COMUNITÁRIO'},'45190':{nome:'ADALBERTO CARVALHO'},'45200':{nome:'ANDERSON VIEIRA'},'45222':{nome:'BENEDITO DA VOZINHA'},'45300':{nome:'JOÃO TERRA'},'45321':{nome:'PROFESSORA GODOI'},'45333':{nome:'ROBERTO VIEIRA'},'45345':{nome:'GABRIEL LUNA'},'45451':{nome:'SORAYA COSTA'},'45456':{nome:'GLÓRIA VALE'},'45525':{nome:'MARIA JOSE'},'45555':{nome:'DANIELA CIRIACO'},'45617':{nome:'NATANRY OSORIO'},'45678':{nome:'JAMES MAYNER'},'45755':{nome:'DRA. LUCILENE FERNANDES'},'45777':{nome:'SAPHIRA'},'45888':{nome:'CARVALHO RIO MELCHIOR'},'50000':{nome:'MICHEL PLATINI'},'50020':{nome:'PROFESSORA RAY'},'50050':{nome:'PATTY RAMIRO'},'50060':{nome:'MANO LIMA'},'50100':{nome:'MAX MACIEL'},'50123':{nome:'KEKA BAGNO'},'50133':{nome:'EDISON CEILÂNDIA'},'50180':{nome:'NATTY VIEIRA'},'50200':{nome:'PIKINEIA'},'50257':{nome:'CONCEIÇÃO DA AGRICULTURA'},'50321':{nome:'PAULO CÉSAR (PC)'},'50444':{nome:'ABEL SANTOS'},'50500':{nome:'DRA. NATÁLIA MATIAS'},'50511':{nome:'MOUSTAFA'},'50700':{nome:'MADU K'},'50777':{nome:'ROMÁRIO LEAL'},'55000':{nome:'DELEGADO PABLO AGUIAR'},'55026':{nome:'IZADORA COIMBRA'},'55033':{nome:'AKILLA MARINHO'},'55055':{nome:'ALESSANDRO CARDOSO'},'55100':{nome:'SANDRA BACELAR'},'55111':{nome:'PASTOR ANDERSON SILVA'},'55123':{nome:'ROGERIO MORRO DA CRUZ'},'55155':{nome:'NELSON NETO'},'55190':{nome:'JABÁ ARRUDA'},'55200':{nome:'ANDREIA SALLES'},'55222':{nome:'TOMAZ'},'55255':{nome:'JADIEL DA CONSTRUÇÃO'},'55321':{nome:'LÉO REZENDE'},'55333':{nome:'CARLOS SÁ'},'55444':{nome:'ERIVELTON'},'55500':{nome:'FATIMA CÓ'},'55533':{nome:'SANDRO BILKS'},'55555':{nome:'PROFESSOR JORDENES'},'55575':{nome:'ALINE VESELY'},'55655':{nome:'ENFERMEIRA LIDIA'},'55661':{nome:'JONATHAN ARAÚJO'},'55678':{nome:'DR. VICENZO'},'55777':{nome:'PROFESSOR IVAN MORAES'},'55855':{nome:'SIMONE MAGALHÃES'},'55888':{nome:'CLEBER DF AGUASCLARAS'},'65123':{nome:'PROFESSOR ELIAS'},'65180':{nome:'BERÊ DARC'},'70000':{nome:'DANIEL RADAR'},'70007':{nome:'ISSA'},'70022':{nome:'ANGELICA'},'70070':{nome:'RIGONE AMORIM'},'70077':{nome:'PATRICIA DA FEIRA'},'70100':{nome:'GABRIELA FREIRE'},'70111':{nome:'SILENE DA SAÚDE'},'70122':{nome:'DR. HELIO GOMES'},'70123':{nome:'WILSON AMIGÃO'},'70190':{nome:'CABO VITORIO'},'70193':{nome:'RENATO SILVEIRA BARBOSA'},'70222':{nome:'PROF WESLEY'},'70234':{nome:'LAURICIO RADIOSAUDE'},'70255':{nome:'DELEGADO LAERCIO'},'70321':{nome:'ROGÉRIO ULYSSES'},'70333':{nome:'GILBERTO ELIAZARIO DE CAMARGOS'},'70369':{nome:'FLAVIO POTIGUAR'},'70456':{nome:'CLEMILTON'},'70555':{nome:'EVALDO LOBATO'},'70700':{nome:'LAU DE PAULA'},'70707':{nome:'LYLY DO AVANTE'},'70770':{nome:'SANDRA SILVA'},'70777':{nome:'ANDERSON GUINÉ'},'70789':{nome:'MARCELE MAMA'},'70870':{nome:'MARI TEIXEIRA'},'70999':{nome:'DR CAIO GRACCO'},'77000':{nome:'BETHANIA KELLY'},'77007':{nome:'FABIO DE MORAIS'},'77023':{nome:'EUGÊNIO MAGALHÃES'},'77077':{nome:'DIEGO LOCUTOR'},'77111':{nome:'DEUSDETE FILHO'},'77122':{nome:'FLAVINHA CEILANDIA'},'77123':{nome:'ADERVAL'},'77135':{nome:'NERY CHARLIE'},'77137':{nome:'MARLENE'},'77190':{nome:'LUCIENE DANIEL DA SEGURANÇA'},'77200':{nome:'IPAMINONA DOS INQUILINOS'},'77222':{nome:'EDSON CORDEIRO'},'77277':{nome:'PASTOR ROBERTO'},'77321':{nome:'NEWTON DOS ESPORTES'},'77330':{nome:'SARGENTO ELIZALDA'},'77456':{nome:'ANACLETO'},'77777':{nome:'EDEM ALEXANDRE'},'77810':{nome:'CRISTIANE CARVALHO'},'77843':{nome:'ORION OLIVEIRA'},'80110':{nome:'BÁRBARA CALISTA'},'80123':{nome:'CHRISTIAN RODRIGUES SENA'}},
+federal: {'1000':{nome:'LUIZ EDUARDO',partido:'REPUBLICANOS'},'1001':{nome:'LIZA LOPES',partido:'REPUBLICANOS'},'1010':{nome:'JULIO CESAR',partido:'REPUBLICANOS'},'1011':{nome:'GILVAN PATRULHA DO CONSUMIDOR',partido:'REPUBLICANOS'},'1015':{nome:'RAVAN LEÃO',partido:'REPUBLICANOS'},'1020':{nome:'FRED LINHARES',partido:'REPUBLICANOS'},'1022':{nome:'CRIS BRITTO',partido:'REPUBLICANOS'},'1050':{nome:'DEFENSOR CELESTINO',partido:'REPUBLICANOS'},'1086':{nome:'CAROL FURLAN',partido:'REPUBLICANOS'},'1088':{nome:'MATHEUS MILANEZ',partido:'REPUBLICANOS'},'1111':{nome:'VALDIRENE TAVARES',partido:'PP'},'1117':{nome:'DRA. MARINA NORONHA',partido:'PP'},'1177':{nome:'MARCOS WESLEY',partido:'PP'},'1190':{nome:'CORONEL MORENO',partido:'PP'},'1212':{nome:'FLAVIO WERNECK',partido:'PDT'},'1213':{nome:'PASTOR ISMAEL LOPES',partido:'PDT'},'1214':{nome:'PAULO TAVARES',partido:'PDT'},'1216':{nome:'ISANIL',partido:'PDT'},'1221':{nome:'JÔ ABREU',partido:'PDT'},'1230':{nome:'PROFA. FÁTIMA SOUSA',partido:'PDT'},'1233':{nome:'MOACIR COLETIVO TRABALHISTA',partido:'PDT'},'1234':{nome:'PROFESSOR RAFAEL PARENTE',partido:'PDT'},'1270':{nome:'LARISSA SCHMIDT',partido:'PDT'},'1300':{nome:'MARIVALDO PEREIRA',partido:'PT'},'1310':{nome:'AGNELO QUEIROZ',partido:'PT'},'1313':{nome:'POLICARPO',partido:'PT'},'1324':{nome:'VANESSA É O BICHO',partido:'PT'},'1331':{nome:'MÁRCIA ABRAHÃO',partido:'PT'},'1333':{nome:'ROSILENE CORRÊA',partido:'PT'},'1361':{nome:'RUTH VENCEREMOS',partido:'PT'},'1400':{nome:'CRIS CAIADO',partido:'MISSÃO'},'1411':{nome:'ALVARO MOZINI',partido:'MISSÃO'},'1414':{nome:'VICTOR RATTES',partido:'MISSÃO'},'1441':{nome:'CAMILA CORRÊA',partido:'MISSÃO'},'1444':{nome:'LUCAS BRASILEIRO',partido:'MISSÃO'},'1456':{nome:'MARTA LIMA',partido:'MISSÃO'},'1500':{nome:'DANIEL DONIZET',partido:'MDB'},'1501':{nome:'WESLEY AMARAL',partido:'MDB'},'1505':{nome:'PAMELA ÁGUIA',partido:'MDB'},'1515':{nome:'RAFAEL PRUDENTE',partido:'MDB'},'1516':{nome:'COSTA NETO',partido:'MDB'},'1522':{nome:'HÉLVIA PARANAGUÁ',partido:'MDB'},'1551':{nome:'JOSY JACOB',partido:'MDB'},'1555':{nome:'ZÉ HUMBERTO',partido:'MDB'},'1599':{nome:'WASHINGTON CORAÇÃO VALENTE',partido:'MDB'},'1801':{nome:'MARIA CLEUDES',partido:'REDE'},'1818':{nome:'ELIANILDO NASCIMENTO',partido:'REDE'},'1819':{nome:'GUILHERME JAGANU',partido:'REDE'},'2000':{nome:'ISMAEL ALMEIDA',partido:'PODE'},'2020':{nome:'FRANÇA',partido:'PODE'},'2022':{nome:'KLESLEY GARCIA',partido:'PODE'},'2026':{nome:'SALVE JORGE',partido:'PODE'},'2027':{nome:'MAYARA NORONHA',partido:'PODE'},'2030':{nome:'SARGENTO MAURÍCIO PARDAL',partido:'PODE'},'2033':{nome:'GORDINHO DA FARMÁCIA',partido:'PODE'},'2088':{nome:'CAROL RIBEIRO',partido:'PODE'},'2090':{nome:'SUBTENENTE VERA',partido:'PODE'},'2200':{nome:'IZALCI LUCAS',partido:'PL'},'2201':{nome:'MARIANA NAIME',partido:'PL'},'2211':{nome:'ULISSIS LIMA',partido:'PL'},'2220':{nome:'AGACIEL MAIA',partido:'PL'},'2222':{nome:'ALBERTO FRAGA',partido:'PL'},'2223':{nome:'MARIA AMÉLIA',partido:'PL'},'2233':{nome:'THIAGO MANZONI',partido:'PL'},'2238':{nome:'CAPITÃO DAVI',partido:'PL'},'2277':{nome:'SANDRA FARAJ',partido:'PL'},'2311':{nome:'MARIANA DE PAULA',partido:'CIDADANIA'},'2323':{nome:'ROBERTO FREIRE',partido:'CIDADANIA'},'2522':{nome:'GILSON AMORIM',partido:'PRD'},'2523':{nome:'SUBTENENTE CINTYA',partido:'PRD'},'2525':{nome:'PABLO VALENTE',partido:'PRD'},'2700':{nome:'ELIZEU COSTA DO UBER',partido:'DC'},'2712':{nome:'LEONARDO BEAR',partido:'DC'},'2727':{nome:'ADRIANO ANIMAL',partido:'DC'},'2733':{nome:'RENATO MACHADO',partido:'DC'},'2750':{nome:'SOCORRO MARTINS',partido:'DC'},'2755':{nome:'SERRALHEIRO RONO PINHEIRO',partido:'DC'},'2770':{nome:'MILENA SOUSA',partido:'DC'},'2777':{nome:'IVONE LOPES',partido:'DC'},'2789':{nome:'EDILSON PARDALS',partido:'DC'},'2900':{nome:'AGUIDA MARIA',partido:'PCO'},'2929':{nome:'CARLOS VINÍCIUS',partido:'PCO'},'2999':{nome:'ANA SCHRAMM',partido:'PCO'},'3000':{nome:'WILKER LEÃO',partido:'NOVO'},'3001':{nome:'CORONEL AVIADOR LUIZ GAMA',partido:'NOVO'},'3004':{nome:'FLAVIO FLEURY',partido:'NOVO'},'3010':{nome:'EMILIO KERBER',partido:'NOVO'},'3012':{nome:'PAULO ECHEBARRIA',partido:'NOVO'},'3022':{nome:'ALE CHIANELLI',partido:'NOVO'},'3030':{nome:'CARINE TEIXEIRA',partido:'NOVO'},'3033':{nome:'NANA',partido:'NOVO'},'3036':{nome:'CIDA VILLAS BÔAS',partido:'NOVO'},'3300':{nome:'ANTONIO SIRIANO',partido:'MOBILIZA'},'3310':{nome:'GARCIA LOCUTOR',partido:'MOBILIZA'},'3322':{nome:'RAPOSÃO DS',partido:'MOBILIZA'},'3332':{nome:'ISAURA BARBOSA',partido:'MOBILIZA'},'3333':{nome:'RITA BALLOCK',partido:'MOBILIZA'},'3344':{nome:'PROFESSORA JULIANA ALVES',partido:'MOBILIZA'},'3355':{nome:'JOEL MATOS DEFENSOR AMBIENTAL',partido:'MOBILIZA'},'3390':{nome:'MAURO LOPES',partido:'MOBILIZA'},'3396':{nome:'LEANDRO BARROSO',partido:'MOBILIZA'},'3500':{nome:'PROFESSOR ANTHONY COUTO',partido:'DEMOCRATA'},'3510':{nome:'RICHARD BANHARA',partido:'DEMOCRATA'},'3522':{nome:'IARA NARDIA',partido:'DEMOCRATA'},'3525':{nome:'STEPHANIE ALVES',partido:'DEMOCRATA'},'3550':{nome:'SANCHEZ',partido:'DEMOCRATA'},'3555':{nome:'C.J. GTA',partido:'DEMOCRATA'},'3577':{nome:'REIS COLETIVO SEGURANÇAPRIVADA',partido:'DEMOCRATA'},'3590':{nome:'PASTOR LIMA NETO',partido:'DEMOCRATA'},'3600':{nome:'TIA NEGA',partido:'AGIR'},'3636':{nome:'SILVA FOTOGRAFO - O CORNO',partido:'AGIR'},'4000':{nome:'RAQUEL MEDEIROS',partido:'PSB'},'4004':{nome:'PROFESSOR ISRAEL',partido:'PSB'},'4007':{nome:'CARLA GEHLEN',partido:'PSB'},'4008':{nome:'DANI FREITAS',partido:'PSB'},'4022':{nome:'DANI SOLTA O VERBO',partido:'PSB'},'4023':{nome:'CRISTOVAM BUARQUE',partido:'PSB'},'4040':{nome:'ROLLEMBERG',partido:'PSB'},'4061':{nome:'WENDER',partido:'PSB'},'4080':{nome:'PROFESSOR GADELHA',partido:'PSB'},'4300':{nome:'JU DOS TIGRADOS',partido:'PV'},'4343':{nome:'PROF. REGINALDO VERAS',partido:'PV'},'4400':{nome:'PROFESSOR FRANCELINO',partido:'UNIÃO'},'4411':{nome:'CARLOS DALVAN',partido:'UNIÃO'},'4444':{nome:'SANDRO AVELAR',partido:'UNIÃO'},'4455':{nome:'ESTER CARVALHO',partido:'UNIÃO'},'4456':{nome:'PROF. DÍDIA',partido:'UNIÃO'},'4500':{nome:'KARLA VINHAS',partido:'PSDB'},'4510':{nome:'GERALDO NAVES O BARRA PESADA',partido:'PSDB'},'4522':{nome:'FELIPE RODRIGUES',partido:'PSDB'},'4543':{nome:'JUNIOR ALMEIDA',partido:'PSDB'},'4545':{nome:'PROFESSOR LÉO MATOS',partido:'PSDB'},'4555':{nome:'OSCAR SILVA',partido:'PSDB'},'4566':{nome:'LEIA XAVIER',partido:'PSDB'},'4567':{nome:'FLÁVIA PORTELA',partido:'PSDB'},'4577':{nome:'ELAINE PINK',partido:'PSDB'},'5000':{nome:'NEIVA LOPES',partido:'PSOL'},'5001':{nome:'ADRIANO FIÚZA',partido:'PSOL'},'5005':{nome:'LUDMILA SUAID',partido:'PSOL'},'5040':{nome:'DRA RAQUEL FERREIRA',partido:'PSOL'},'5050':{nome:'FÁBIO FELIX',partido:'PSOL'},'5080':{nome:'ENFERMEIRA KARINE',partido:'PSOL'},'5500':{nome:'ADILA MARIA',partido:'PSD'},'5522':{nome:'ADRIANO AMARAL',partido:'PSD'},'5544':{nome:'DR. JOÃO LUIZ',partido:'PSD'},'5545':{nome:'SARGENTO ELIOMAR',partido:'PSD'},'5551':{nome:'DELEGADO NUGOLI',partido:'PSD'},'5555':{nome:'CAROL FLEURY',partido:'PSD'},'5561':{nome:'RONALDO FONSECA',partido:'PSD'},'5566':{nome:'ABADIA',partido:'PSD'},'5577':{nome:'JÚLIO ISIDRO',partido:'PSD'},'7000':{nome:'DR. CARLOS',partido:'AVANTE'},'7007':{nome:'JEAN VICTOR',partido:'AVANTE'},'7022':{nome:'ROGERIO ARAPOANGA',partido:'AVANTE'},'7033':{nome:'PASTORA ANA LIMA',partido:'AVANTE'},'7052':{nome:'ANA FEROLA',partido:'AVANTE'},'7055':{nome:'GLAUCIA DO ARRUDA',partido:'AVANTE'},'7070':{nome:'RODOLPHO HOTH HOTH',partido:'AVANTE'},'7077':{nome:'JUSCELINO KUBITSCHEK',partido:'AVANTE'},'7088':{nome:'PAULO SA',partido:'AVANTE'},'7707':{nome:'DIEGO COSTA',partido:'SOLIDARIEDADE'},'7710':{nome:'LETICIA LEAL',partido:'SOLIDARIEDADE'},'7722':{nome:'JAIR MARINHO',partido:'SOLIDARIEDADE'},'7733':{nome:'GABRIEL PORTELLA',partido:'SOLIDARIEDADE'},'7777':{nome:'GERCIANE',partido:'SOLIDARIEDADE'},'7778':{nome:'MAX FERRAMENTAS',partido:'SOLIDARIEDADE'},'8000':{nome:'MILENA DO MLB',partido:'UP'},'8080':{nome:'DURVAL',partido:'UP'}},
+  governador: {
+    '55': { nome:'ARRUDA', partido:'PSD' },
+    '40': { nome:'CAPPELLI', partido:'PSB' },
+    '11': { nome:'CELINA LEÃO', partido:'PP' },
+    '36': { nome:'ELISSON', partido:'AGIR' },
+    '29': { nome:'EXPEDITO MENDONÇA', partido:'PCO' },
+    '30': { nome:'KIKO CAPUTO', partido:'NOVO' },
+    '13': { nome:'LEANDRO GRASS', partido:'PT' },
+    '45': { nome:'PAULA BELMONTE', partido:'PSDB' },
+    '16': { nome:'PROFESSOR ROBSON', partido:'PSTU' },
+    '80': { nome:'PROFESSORA SAMARA MINEIRO', partido:'UP' },
+    '28': { nome:'RICO PINHEIRO', partido:'PRTB' },
+  },
+  senador1: {
+    '355': { nome:'AVENIR ROSA', partido:'DEMOCRATA' },
+    '223': { nome:'BIA KICIS', partido:'PL' },
+    '290': { nome:'DAVID HORN', partido:'PCO' },
+    '131': { nome:'ERIKA KOKAY', partido:'PT' },
+    '456': { nome:'GUTO FELÍCIO DOS SANTOS', partido:'PSDB' },
+    '123': { nome:'LEILA DO VÔLEI', partido:'PDT' },
+    '700': { nome:'MARLEY', partido:'AVANTE' },
+    '222': { nome:'MICHELLE BOLSONARO', partido:'PL' },
+    '800': { nome:'PROFESSOR GUILHERME AMORIM', partido:'UP' },
+    '555': { nome:'RONALDO FONSECA', partido:'PSD' },
+    '300': { nome:'SEBASTIÃO COELHO', partido:'NOVO' },
+    '360': { nome:'TIAGO', partido:'AGIR' },
+    '161': { nome:'ZANATA', partido:'PSTU' },
+  },
+  senador2: {
+    '355': { nome:'AVENIR ROSA', partido:'DEMOCRATA' },
+    '223': { nome:'BIA KICIS', partido:'PL' },
+    '290': { nome:'DAVID HORN', partido:'PCO' },
+    '131': { nome:'ERIKA KOKAY', partido:'PT' },
+    '456': { nome:'GUTO FELÍCIO DOS SANTOS', partido:'PSDB' },
+    '123': { nome:'LEILA DO VÔLEI', partido:'PDT' },
+    '700': { nome:'MARLEY', partido:'AVANTE' },
+    '222': { nome:'MICHELLE BOLSONARO', partido:'PL' },
+    '800': { nome:'PROFESSOR GUILHERME AMORIM', partido:'UP' },
+    '555': { nome:'RONALDO FONSECA', partido:'PSD' },
+    '300': { nome:'SEBASTIÃO COELHO', partido:'NOVO' },
+    '360': { nome:'TIAGO', partido:'AGIR' },
+    '161': { nome:'ZANATA', partido:'PSTU' },
+  },
+  presidente: {
+    '27': { nome:'CLARIANA BARÃO', partido:'DC' },
+    '21': { nome:'EDMILSON COSTA', partido:'PCB' },
+    '70': { nome:'ESCRITOR AUGUSTO CURY', partido:'AVANTE' },
+    '22': { nome:'FLÁVIO BOLSONARO', partido:'PL' },
+    '16': { nome:'HERTZ DIAS', partido:'PSTU' },
+    '13': { nome:'LULA', partido:'PT' },
+    '14': { nome:'RENAN SANTOS', partido:'MISSÃO' },
+    '55': { nome:'RONALDO CAIADO', partido:'PSD' },
+    '29': { nome:'RUI COSTA PIMENTA', partido:'PCO' },
+    '80': { nome:'SAMARA', partido:'UP' },
+    '35': { nome:'VETERINÁRIO WILSON GRASSI', partido:'DEMOCRATA' },
+    '30': { nome:'ZEMA', partido:'NOVO' },
+  }
+};
+
+let idx = 0;
+let current = '';
+const answers = {};
+const VOTED_KEY = 'urna2026_treinou';
+const LOCK_ENABLED = true;
+
+function checkAlreadyVoted(){
+  if(!LOCK_ENABLED) return;
+  try{
+    if(localStorage.getItem(VOTED_KEY) === '1'){
+      el('startBtn').disabled = true;
+      el('startBtn').textContent = 'JÁ TREINADO NESTE APARELHO';
+      el('alreadyVoted').style.display = 'block';
+    }
+  }catch(e){ /* localStorage indisponível: segue sem a trava */ }
+}
+checkAlreadyVoted();
+
+function el(id){ return document.getElementById(id); }
+
+function iniciar(){
+  el('screenStart').style.display = 'none';
+  el('screenVote').style.display = 'flex';
+  renderOffice();
+}
+
+function renderOffice(){
+  current = '';
+  const o = OFFICES[idx];
+  el('officeLabel').textContent = o.label;
+  el('hintText').textContent = 'Digite o número (' + o.maxDigits + ' dígitos) e aperte CONFIRMA.';
+  renderDigits();
+  renderDots();
+}
+
+function renderDots(){
+  const wrap = el('progressDots');
+  wrap.innerHTML = '';
+  OFFICES.forEach((o,i)=>{
+    const s = document.createElement('span');
+    if(i < idx) s.className = 'done';
+    else if(i === idx) s.className = 'now';
+    wrap.appendChild(s);
+  });
+}
+
+function renderDigits(){
+  const o = OFFICES[idx];
+  const d = el('digitsDisplay');
+  d.innerHTML = current.length ? current : '<span class="ph">' + '—'.repeat(o.maxDigits) + '</span>';
+  const known = KNOWN[o.key] && KNOWN[o.key][current];
+  el('nameDisplay').textContent = known ? known.nome : (current.length === o.maxDigits ? 'Nº digitado — não conferido nesta simulação' : '');
+  el('partyDisplay').textContent = known ? (known.partido || '') : '';
+}
+
+function digit(n){
+  const o = OFFICES[idx];
+  if(current.length >= o.maxDigits) return;
+  current += String(n);
+  renderDigits();
+}
+
+function corrige(){
+  current = '';
+  renderDigits();
+}
+
+function branco(){
+  answers[OFFICES[idx].key] = 'BRANCO';
+  avancar();
+}
+
+function confirma(){
+  const o = OFFICES[idx];
+  if(current.length === 0){ branco(); return; }
+  answers[o.key] = current;
+  avancar();
+}
+
+function avancar(){
+  idx++;
+  if(idx >= OFFICES.length){
+    finalizar();
+  } else {
+    renderOffice();
+  }
+}
+
+function finalizar(){
+  el('screenVote').style.display = 'none';
+  el('keypad').style.display = 'none';
+  el('screenEnd').style.display = 'flex';
+  el('screenRestart').style.display = 'block';
+  enviarResultado();
+}
+
+function enviarResultado(){
+  try{
+    OFFICES.forEach(o=>{
+      el(o.fieldId).value = answers[o.key] || 'BRANCO';
+    });
+    el('gform').submit();
+    if(LOCK_ENABLED){ try{ localStorage.setItem(VOTED_KEY, '1'); }catch(e){} }
+    setTimeout(()=>{
+      el('sendStatus').innerHTML = '<span class="sent-ok">Resultado anônimo enviado. Pode fechar esta janela.</span>';
+    }, 900);
+  } catch(e){
+    el('sendStatus').innerHTML = '<span class="sent-fail">Não foi possível enviar o placar agora — seu treino de voto valeu de qualquer forma.</span>';
+  }
+}
+</script>
+
+</body>
+</html>
